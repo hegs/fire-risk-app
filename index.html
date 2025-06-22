@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Fire Risk Lookup Web App - Quickly determine wildfire risk ratings for California properties">
+    <meta name="keywords" content="fire risk, wildfire, California, insurance, property assessment">
+    <meta name="author" content="Fire Risk App Team">
+    <meta name="robots" content="noindex, nofollow">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Fire Risk Lookup Web App">
+    <meta property="og:description" content="Quickly determine wildfire risk ratings for California properties">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:title" content="Fire Risk Lookup Web App">
+    <meta property="twitter:description" content="Quickly determine wildfire risk ratings for California properties">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="src/css/styles.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    
+    <title>Fire Risk Lookup Web App</title>
+</head>
+<body>
+    <header>
+        <h1>🔥 Fire Risk Lookup</h1>
+        <p>Quickly assess wildfire risk for California properties</p>
+    </header>
+
+    <main>
+        <section id="address-input-section">
+            <h2>Enter Property Address</h2>
+            <p class="form-description">Enter a California street address to check its wildfire risk rating.</p>
+            
+            <form id="address-form" novalidate>
+                <div class="form-group">
+                    <label for="address-input">California Address:</label>
+                    <div class="input-wrapper">
+                        <input 
+                            type="text" 
+                            id="address-input" 
+                            name="address" 
+                            placeholder="e.g., 123 Main St, San Francisco, CA 94102"
+                            required
+                            autocomplete="street-address"
+                            aria-describedby="address-help address-error"
+                            maxlength="200"
+                        >
+                        <div class="input-icon">
+                            <span class="icon">📍</span>
+                        </div>
+                    </div>
+                    <div id="address-help" class="help-text">
+                        Enter a complete street address including city and ZIP code for best results.
+                    </div>
+                    <div id="address-error" class="error-text" role="alert" aria-live="polite"></div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" id="submit-btn" disabled>
+                        <span class="btn-text">Check Fire Risk</span>
+                        <span class="btn-icon">🔥</span>
+                    </button>
+                    <button type="button" id="clear-btn" class="secondary-btn">
+                        Clear
+                    </button>
+                </div>
+            </form>
+            
+            <div class="form-examples">
+                <h3>Example Addresses:</h3>
+                <ul>
+                    <li><button type="button" class="example-btn" data-address="123 Main St, San Francisco, CA 94102">San Francisco Example</button></li>
+                    <li><button type="button" class="example-btn" data-address="456 Oak Ave, Los Angeles, CA 90210">Los Angeles Example</button></li>
+                    <li><button type="button" class="example-btn" data-address="789 Pine St, Sacramento, CA 95814">Sacramento Example</button></li>
+                </ul>
+            </div>
+        </section>
+
+        <section id="loading-section" class="hidden">
+            <div class="loading-spinner"></div>
+            <p>Analyzing fire risk...</p>
+        </section>
+
+        <section id="results-section" class="results-card" style="display: none;">
+            <h2>Risk Assessment</h2>
+            <div id="risk-display">
+                <div id="risk-category"></div>
+                <div id="risk-description"></div>
+                <div id="data-source"></div>
+            </div>
+            <div id="map-container" style="display: none;">
+                <div id="map"></div>
+            </div>
+            <button id="start-over-btn" class="btn btn-secondary">Start Over</button>
+        </section>
+
+        <section id="error-section" class="hidden">
+            <h2>Error</h2>
+            <div id="error-message"></div>
+            <button id="try-again-btn">Try Again</button>
+        </section>
+    </main>
+
+    <footer>
+        <p>Data provided by CAL FIRE Fire Hazard Severity Zones (FHSZ)</p>
+        <p>&copy; 2024 Fire Risk Lookup Web App</p>
+    </footer>
+
+    <!-- JavaScript Modules -->
+    <script type="module" src="src/js/app.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+</body>
+</html> 
