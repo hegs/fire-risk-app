@@ -1,161 +1,150 @@
 /**
  * @file app.js
- * @description Main application logic for the Fire Risk Lookup app.
+ * @description Main application logic for the Fire Risk Assessment app.
  */
 
 import { AddressValidator } from '../modules/validation.js';
 import { geocodingService } from '../modules/geocoding.js';
 import { getFireRisk } from '../modules/fire-risk-api.js';
-import { displayMap } from '../modules/map.js';
+import { displayMap, clearMap, invalidateMapSize } from '../modules/map.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-  const addressForm = document.getElementById('address-form');
-  const addressInput = document.getElementById('address-input');
-  const submitBtn = document.getElementById('submit-btn');
-  const clearBtn = document.getElementById('clear-btn');
-  const addressError = document.getElementById('address-error');
-  const exampleBtns = document.querySelectorAll('.example-btn');
+    // --- DOM Elements ---
+    const addressForm = document.getElementById('address-form');
+    const addressInput = document.getElementById('address-input');
+    const submitBtn = document.getElementById('submit-btn');
+    
+    const searchSection = document.getElementById('search-section');
+    const loadingSection = document.getElementById('loading-section');
+    const resultsContainer = document.getElementById('results-container');
+    const errorSection = document.getElementById('error-section');
+    
+    const riskDisplay = document.getElementById('risk-display');
+    const resultAddress = document.getElementById('result-address');
+    const dataSource = document.getElementById('data-source');
+    const errorMessage = document.getElementById('error-message');
+    const tryAgainBtn = document.getElementById('try-again-btn');
 
-  const loadingSection = document.getElementById('loading-section');
-  const resultsSection = document.getElementById('results-section');
-  const errorSection = document.getElementById('error-section');
-  const errorMessage = document.getElementById('error-message');
-  const tryAgainBtn = document.getElementById('try-again-btn');
-  const riskDisplay = document.getElementById('risk-display');
-  const mapContainer = document.getElementById('map-container');
-  
-  const addressInputSection = document.getElementById('address-input-section');
-  const validator = new AddressValidator();
+    const validator = new AddressValidator();
 
-  /**
-   * Returns a brief explanation of what each fire risk category means
-   * @param {string} riskLevel - The fire risk level
-   * @returns {string} Explanation of the risk category
-   */
-  const getRiskExplanation = (riskLevel) => {
-    const explanations = {
-      'very-high': 'Very High Fire Hazard Zone: Areas with the highest risk of wildfire. These areas typically have dense vegetation, steep slopes, and limited access for firefighting. Extreme caution and preparedness are essential.',
-      'high': 'High Fire Hazard Zone: Areas with significant wildfire risk due to vegetation, terrain, or weather patterns. Regular fire safety measures and evacuation planning are recommended.',
-      'moderate': 'Moderate Fire Hazard Zone: Areas with moderate wildfire risk. While less severe than high-risk areas, fire safety precautions should still be maintained.',
-      'low': 'Low Fire Hazard Zone: Areas with minimal wildfire risk. These areas typically have limited vegetation or are in urban settings with good fire protection infrastructure.',
-      'not-in-designated-hazard-zone': 'Not in a Designated Hazard Zone: This location is not currently classified in a formal fire hazard zone. However, fire safety awareness is always recommended.'
+    // --- State Management ---
+    const showSection = (section) => {
+        searchSection.classList.add('hidden');
+        loadingSection.classList.add('hidden');
+        resultsContainer.classList.add('hidden');
+        errorSection.classList.add('hidden');
+        if (section) {
+            section.classList.remove('hidden');
+        }
+    };
+
+    const resetUI = () => {
+        showSection(searchSection);
+        addressInput.value = '';
+        submitBtn.disabled = true;
+        addressInput.classList.remove('valid', 'invalid');
+        clearMap();
+    };
+
+    // --- Event Handlers ---
+    addressInput.addEventListener('input', () => {
+        const validation = validator.validate(addressInput.value);
+        submitBtn.disabled = !validation.isValid;
+    });
+
+    addressForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const address = addressInput.value.trim();
+        if (!validator.validate(address).isValid) return;
+
+        showSection(loadingSection);
+
+        try {
+            const geocodeData = await geocodingService.geocodeAddress(address);
+            if (!geocodeData || !geocodeData.coordinates) {
+                throw new Error('Could not find coordinates for the address. Please try a different address.');
+            }
+            
+            const { lat, lon } = geocodeData.coordinates;
+            const fireRisk = await getFireRisk(lat, lon);
+            
+            displayResults(fireRisk, geocodeData);
+            displayMap(lat, lon);
+            
+            showSection(resultsContainer);
+            invalidateMapSize();
+
+        } catch (error) {
+            console.error('Error during address processing:', error);
+            errorMessage.textContent = error.message || 'An unexpected error occurred. Please try again.';
+            showSection(errorSection);
+        }
+    });
+
+    tryAgainBtn.addEventListener('click', resetUI);
+
+    // --- UI Update Functions ---
+    const getRiskInfo = (riskLevel) => {
+        const normalizedRisk = (riskLevel || 'unknown').toLowerCase().replace(/\s+/g, '-');
+        const riskInfo = {
+            'very-high': {
+                title: 'Very High Risk',
+                description: 'This area has a very high risk of wildfire according to CAL FIRE\'s assessment.',
+                icon: 'alert-triangle',
+            },
+            'high': {
+                title: 'High Risk',
+                description: 'This area has a high risk of wildfire according to CAL FIRE\'s assessment.',
+                icon: 'alert-triangle',
+            },
+            'moderate': {
+                title: 'Moderate Risk',
+                description: 'This area has a moderate risk of wildfire according to CAL FIRE\'s assessment.',
+                icon: 'alert-triangle',
+            },
+            'low': {
+                title: 'Low Risk',
+                description: 'This area has a low risk of wildfire according to CAL FIRE\'s assessment.',
+                icon: 'shield-check',
+            },
+            'not-in-designated-hazard-zone': {
+                title: 'Not in Hazard Zone',
+                description: 'This location is not currently in a designated high fire hazard zone.',
+                icon: 'check-circle',
+            },
+             'unknown': {
+                title: 'Risk Not Available',
+                description: 'Fire risk data is not available for this specific location.',
+                icon: 'help-circle',
+            }
+        };
+        return riskInfo[normalizedRisk] || riskInfo['unknown'];
     };
     
-    const normalizedRisk = riskLevel.toLowerCase().replace(/\s+/g, '-');
-    return explanations[normalizedRisk] || 'Risk level information not available.';
-  };
-
-  const updateUIState = (state) => {
-    loadingSection.style.display = state === 'loading' ? 'block' : 'none';
-    resultsSection.style.display = state === 'results' ? 'block' : 'none';
-    errorSection.style.display = state === 'error' ? 'block' : 'none';
-    addressForm.style.display = state === 'input' ? 'block' : 'none';
-    if (state === 'input') {
-      addressInput.value = '';
-      submitBtn.disabled = true;
-      mapContainer.style.display = 'none';
-    }
-  };
-
-  const showLoadingState = (message) => {
-    loadingSection.querySelector('p').textContent = message;
-    updateUIState('loading');
-  };
-
-  const showResultsState = (htmlContent) => {
-    riskDisplay.innerHTML = htmlContent;
-    updateUIState('results');
-  };
-
-  const showErrorState = (message) => {
-    errorMessage.textContent = message;
-    updateUIState('error');
-  };
-
-  const checkAddressValidity = () => {
-    const validation = validator.validate(addressInput.value);
-    submitBtn.disabled = !validation.isValid;
-    
-    clearBtn.style.display = addressInput.value.length > 0 ? 'inline-block' : 'none';
-
-    if (!validation.isValid && addressInput.value.length > 0 && document.activeElement !== addressInput) {
-        addressError.textContent = validation.errors.length > 0 ? validation.errors[0].message : 'Invalid address';
-        addressError.style.display = 'block';
-    } else {
-        addressError.textContent = '';
-        addressError.style.display = 'none';
-    }
-  };
-
-  const handleAddressSubmit = async (event) => {
-    event.preventDefault();
-    const address = addressInput.value.trim();
-
-    const validation = validator.validate(address);
-    if (!validation.isValid) {
-      return;
-    }
-    
-    showLoadingState('Geocoding address...');
-
-    try {
-      const geocodeData = await geocodingService.geocodeAddress(address);
-      if (geocodeData && geocodeData.coordinates) {
-        showLoadingState('Assessing fire risk...');
-        const fireRisk = await getFireRisk(geocodeData.coordinates.lat, geocodeData.coordinates.lon);
-
-        const riskLevelClass = fireRisk ? fireRisk.toLowerCase().replace(/\s+/g, '-') : 'unknown';
-        const riskText = fireRisk || 'Not Available';
+    const displayResults = (fireRisk, geocodeData) => {
+        const normalizedRisk = (fireRisk || 'unknown').toLowerCase().replace(/\s+/g, '-');
+        const { title, description, icon } = getRiskInfo(normalizedRisk);
         
-        const riskExplanation = getRiskExplanation(fireRisk);
-        
-        const resultsHTML = `
-          <p><strong>Address:</strong> ${geocodeData.fullAddress}</p>
-          <p><strong>Fire Risk:</strong> <span class="risk-level-${riskLevelClass}">${riskText}</span></p>
-          <p><strong>Explanation:</strong> ${riskExplanation}</p>
+        const iconSvg = {
+            'alert-triangle': `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`,
+            'shield-check': `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polyline points="9 12 12 15 22 5"></polyline></svg>`,
+            'check-circle': `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`,
+            'help-circle': `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`,
+        };
+
+        riskDisplay.className = `risk-level-${normalizedRisk}`;
+        riskDisplay.innerHTML = `
+            <div class="icon">${iconSvg[icon]}</div>
+            <div>
+                <h3>${title}</h3>
+                <p>${description}</p>
+            </div>
         `;
-        
-        showResultsState(resultsHTML);
-        displayMap(geocodeData.coordinates.lat, geocodeData.coordinates.lon);
 
-      } else {
-        showErrorState('Could not find coordinates for the address. Please try a different address.');
-      }
-    } catch (error) {
-      console.error('Geocoding or Fire Risk API error:', error);
-      showErrorState(error.message || 'An unexpected error occurred.');
-    }
-  };
+        resultAddress.textContent = geocodeData.fullAddress;
+        dataSource.textContent = 'CAL FIRE Fire Hazard Severity Zones (FHSZ)';
+    };
 
-  addressForm.addEventListener('submit', handleAddressSubmit);
-  addressInput.addEventListener('input', checkAddressValidity);
-  addressInput.addEventListener('blur', checkAddressValidity);
-  
-  if (clearBtn) {
-    clearBtn.addEventListener('click', () => {
-      updateUIState('input');
-    });
-  }
-
-  const startOverBtn = document.getElementById('start-over-btn');
-  if (startOverBtn) {
-    startOverBtn.addEventListener('click', () => {
-      updateUIState('input');
-    });
-  }
-
-  tryAgainBtn.addEventListener('click', () => {
-    updateUIState('input');
-  });
-
-  exampleBtns.forEach(btn => {
-    btn.addEventListener('click', (e) => {
-        addressInput.value = e.target.dataset.address;
-        checkAddressValidity();
-    });
-  });
-
-  // Initial state setup
-  updateUIState('input');
-  checkAddressValidity();
+    // --- Initial State ---
+    resetUI();
 }); 

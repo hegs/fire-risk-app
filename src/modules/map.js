@@ -13,9 +13,6 @@ let map = null;
  * @param {number} zoom - The zoom level for the map.
  */
 export function displayMap(lat, lon, zoom = 15) {
-  const mapContainer = document.getElementById('map-container');
-  mapContainer.style.display = 'block';
-
   if (!map) {
     map = L.map('map').setView([lat, lon], zoom);
 
@@ -37,4 +34,25 @@ export function displayMap(lat, lon, zoom = 15) {
   L.marker([lat, lon]).addTo(map)
     .bindPopup('Approximate Location')
     .openPopup();
+}
+
+/**
+ * Recalculates map size when its container is resized.
+ */
+export function invalidateMapSize() {
+  if (map) {
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 10);
+  }
+}
+
+/**
+ * Clears the map and hides the container.
+ */
+export function clearMap() {
+    if (map) {
+        map.remove();
+        map = null;
+    }
 } 
