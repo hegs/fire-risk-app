@@ -13,7 +13,7 @@ import json
 
 # Configuration
 PORT = 8000
-HOST = 'localhost'
+HOST = '0.0.0.0'
 
 # MIME types for proper file serving
 MIME_TYPES = {
@@ -96,6 +96,7 @@ def create_server():
         with socketserver.TCPServer((HOST, PORT), FireRiskHTTPRequestHandler) as httpd:
             print(f"🚀 Fire Risk Lookup Development Server")
             print(f"📍 Server running at: http://{HOST}:{PORT}")
+            print(f"🌐 Access your app in the Webview or at the public URL")
             print(f"📁 Serving files from: {os.getcwd()}")
             print(f"🌐 CORS enabled for all origins")
             print(f"⏹️  Press Ctrl+C to stop the server")
